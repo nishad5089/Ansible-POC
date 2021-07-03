@@ -181,6 +181,7 @@ ansible-playbook -i inventory playbook.yml --tags="kill" -vvv
 . https://www.programmersought.com/article/11971011253/
 
 ## Contributors
+. Rezaul Hasan
 . Dipanjal Maitra
 . Nazim Uddin Asif
 . Abdur Rahim Nsihad

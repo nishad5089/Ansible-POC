@@ -1,0 +1,181 @@
+# What is ansible?
+
+Ansible is an open-source software provisioning, configuration management, and application-deployment tool enabling infrastructure as code. It runs on many Unix-like systems, and can configure both Unix-like systems as well as Microsoft Windows.
+
+## How to configure Ansible to Windows?
+
+1. Open windows powershell then run this comment
+    . Enable-windowsOptionalFeature -online -featurename:Microsoft-Windows-Subsystem-Linux
+2. Download ubuntu from microsoft store and lunch it.
+3. Then run this comment in ubuntu terminal:
+    . sudo apt-add-repository ppa:ansible/ansible
+4. Then run this comment for install ansible.
+    . sudo apt-get install ansible
+5. Finally, check ansible is successfully download or not
+    . asible --version
+
+## How to work in ansible?
+
+1. Create a folder in c drive.
+2. All the required file such as, inventory file, playbook, vars file, jars put this folder.
+3. Open the terminal of ubuntu and go to this folder and run a command
+    . ansible-playbook -i <inventory file name with extension> <playbook file name with extension> -vvv
+
+## File details:
+
+1. Inventory file: The Ansible inventory file defines the hosts and groups of hosts upon which commands, modules, and tasks in a playbook operate.
+The inventory file have list of individual hosts or user-defined groups of hosts with their necessary credentials.
+2. Playbook file: Playbooks are the files where Ansible code is written. Playbooks are written in YAML format. Playbooks are one of the core features of Ansible and tell Ansible what to execute.
+They are like a to-do list for Ansible that contains a list of tasks.
+Playbooks contain the steps which the user wants to execute on a particular machine. Playbooks are run sequentially. Playbooks are the building blocks for all the use cases of Ansible.
+
+## Describe Inventory file:
+
+**all** group contains every host. If we define group of host we need to add **children** then under **children** we need to defile group name.
+
+in our case,
+----
+all:
+ children:
+    web:
+     hosts:
+        172.16.229.***:
+    vars:
+        ansible_ssh_user: user
+        ansible_ssh_pass: BS-iBank**23#
+
+----
+here,
+
+**web** : it is the name of group where we place our hosts.
+
+**vars** : we need to place all the credentials here.
+
+1. ansible_ssh_user: we need to place our username here, 'user' is our username of host.
+2. ansible_ssh_pass: we need to place our password here, 'BS-iBank**3#' is our password.
+
+## Describe playbook
+
+**hosts** : in playbook, this group contains the name of host which come from inventory file and if we define the name it automatically configured from inventory file.
+
+**vars_files** : we can separate our all variable in other files from playbook. This is the place where we incorporate our var files.
+
+**tasks** : it contains list of tasks and execute it sequentially and each element has multiple properties differentiate it by the name property.
+
+### Playbook logic
+
+First understand the contents of the entire playbook
+
+. Get the name of the local jar package
+. Upload to the server jar package, the best suffix of the jar package with version information, can be specified when maven is packaged
+. Stop the original service
+. Check if the original service is stopped, if not stopped, forcibly kill..
+. Run the new jar package
+
+### describe
+
+1 . "get local file name": here we take all of our file details and store it in 'file_name'.
+----
+- name: get local file name
+  local_action: shell ls /mnt/c/ansiblepractice/target/*.jar
+  register: file_name
+  tags: test0
+----
+
+2 . "print file names": here we debug our 'file_name' variable. it executes when failed property from file_name variable is false.
+----
+- name: print file names
+  tags: test0
+  debug:
+    var: file_name.stdout_lines
+  when: not file_name.failed | bool
+
+----
+3 . Upload jar package to server from multiple location
+----
+
+- name: upload jar file to server
+  tags:
+    - upload
+    - test
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  with_items:
+    - "{{ file_sources }}"
+
+----
+
+4 . Get the pid of the last jar package running
+----
+- name: get pid of api
+  tags:
+    - test
+    - kill
+  shell: "ps -ef | grep -v grep | grep {{ item }} | awk '{print $2}'"
+  register: running_processes
+  with_items: "{{services}}"
+----
+
+5 . kill running processes
+----
+- name: Kill running processes
+  shell: "kill {{ item }}"
+  tags:
+    - test1
+    - kill
+  with_items: "{{ running_processes.results | map(attribute='stdout_lines') | list }}"
+----
+
+6 . Wait for 60s, confirm whether the obtained pid stops running.
+----
+- name: Wait for 60s, confirm whether the obtained pid stops running
+  wait_for:
+    path: "/proc/{{ item }}/status"
+    state: absent
+    timeout: 60
+  tags:
+    - test
+    - kill
+  with_items: "{{ running_processes.results | map(attribute='stdout_lines') | list }}"
+  ignore_errors: yes
+  register: killed_processes
+----
+7 . Forced to kill, not stopped running process
+----
+- name: Force kill stuck processes
+  shell: "kill -9 {{ item }}"
+  with_items: "{{ killed_processes.results | select('failed') | map(attribute='item') | list }}"
+----
+8 . Checking jar file exist in a remote path and store into a register as an array
+----
+- name: "Checking files of a remote path"
+  tags:
+    - execute
+    - check
+  find:
+    paths: "{{ item.dest }}"
+    pattern: "*.jar"
+    file_type: file
+    recurse: yes
+  with_items: "{{ file_sources }}"
+  register: jar_to_be_run
+----
+9 . Start jar with loop
+----
+
+- name: start api
+  shell: "nohup java -jar {{ item.path }} &"
+  tags:
+    - execute
+    - start
+  with_items: "{{ jar_to_be_run.results | map(attribute='files') | list }}"
+----
+
+## Run Command
+ansible-playbook -i inventory playbook.yml --tags="kill" -vvv
+
+## Reference
+. https://www.ansible.com/resources/get-started
+. https://medium.com/@mitesh_shamra/introduction-to-ansible-e5b56ee76b8c
+. https://www.programmersought.com/article/11971011253/

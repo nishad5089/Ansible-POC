@@ -54,7 +54,7 @@
       with_items: "{{ killed_processes.results | select('failed') | map(attribute='item') | list }}"
 
     #Checking jar file exist and storing into a register as a list
-    - name: "Checking files of directory"
+    - name: "Checking files of a remote path"
       tags:
         - execute
         - check

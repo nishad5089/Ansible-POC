@@ -1,0 +1,76 @@
+---
+- hosts: web
+  vars_files:
+    - variable.yml
+
+  tasks:
+    # Upload jar package to server
+    - name: upload jar file to server
+      tags:
+        - upload
+        - test
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+      with_items:
+        - "{{ file_sources }}"
+
+    # Get the pid of the last jar package running
+    - name: get pid of api
+      tags:
+        - test
+        - kill
+      shell: "ps -ef | grep -v grep | grep {{ item }} | awk '{print $2}'"
+      register: running_processes
+      with_items: "{{ services }}"
+
+    # kill running processes
+    - name: Kill running processes
+      shell: "kill {{ item }}"
+      tags:
+        - test1
+        - kill
+      with_items: "{{ running_processes.results | map(attribute='stdout_lines') | list }}"
+
+    # Wait for 60s, confirm whether the obtained pid stops running.
+    - name: Wait for 60s, confirm whether the obtained pid stops running
+      wait_for:
+        path: "/proc/{{ item }}/status"
+        state: absent
+        timeout: 60
+      tags:
+        - test
+        - kill
+      with_items: "{{ running_processes.results | map(attribute='stdout_lines') | list }}"
+      ignore_errors: yes
+      register: killed_processes
+
+    # Forced to kill, not stopped running process
+    - name: Force kill stuck processes
+      shell: "kill -9 {{ item }}"
+      tags:
+        - test
+        - kill
+      with_items: "{{ killed_processes.results | select('failed') | map(attribute='item') | list }}"
+
+    #Checking jar file exist and storing into a register as a list
+    - name: "Checking files of directory"
+      tags:
+        - execute
+        - check
+      find:
+        paths: "{{ item.dest }}"
+        pattern: "*.jar"
+        file_type: file
+        recurse: yes
+      with_items: "{{ file_sources }}"
+      register: jar_to_be_run
+
+    #Start jar packages
+    - name: start api
+      shell: "nohup java -jar {{ item.path }} &"
+      tags:
+        - execute
+        - start
+      with_items: "{{ jar_to_be_run.results | map(attribute='files') | list }}"
+

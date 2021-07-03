@@ -1,0 +1,14 @@
+separator: '/'
+pwd: '/mnt/c/ansiblepractice/target/'
+remote_pwd: '/home/user/asif444/'
+
+services:
+  - helloapp
+  - test
+
+file_sources:
+  - src: "/mnt/c/ansiblepractice/target/helloapp-0.0.1-SNAPSHOT.jar"
+    dest: "~/asif444/"
+
+  - src: "/mnt/c/ansiblepractice/target/helloapp-0.0.2.jar"
+    dest: "~/asif444/"
